@@ -41,8 +41,8 @@ func main() {
 
 	var svc service.StringService
 	svc = service.StringServiceImpl{}
-	svc = logging.LoggingMiddleware{logger, svc}
-	svc = instrumenting.InstrumentingMiddleware{requestCount, requestLatency, countResult, svc}
+	svc = logging.LoggingMiddleware{Logger: logger, Next: svc}
+	svc = instrumenting.InstrumentingMiddleware{RequestCount: requestCount, RequestLatency: requestLatency, CountResult: countResult, Next: svc}
 
 	uppercaseHandler := httptransport.NewServer(
 		transport.MakeUppercaseEndpoint(svc),
