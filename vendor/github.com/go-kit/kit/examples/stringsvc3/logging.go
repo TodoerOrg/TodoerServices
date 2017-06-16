@@ -6,8 +6,7 @@ import (
 	"github.com/go-kit/kit/log"
 )
 
-// LoggingMiddleware ...
-func LoggingMiddleware(logger log.Logger) ServiceMiddleware {
+func loggingMiddleware(logger log.Logger) ServiceMiddleware {
 	return func(next StringService) StringService {
 		return logmw{logger, next}
 	}
