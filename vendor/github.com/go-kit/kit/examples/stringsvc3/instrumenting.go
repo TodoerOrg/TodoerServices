@@ -1,4 +1,4 @@
-package main
+pa
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/go-kit/kit/metrics"
 )
 
-func instrumentingMiddleware(
+func InstrumentingMiddleware(
 	requestCount metrics.Counter,
 	requestLatency metrics.Histogram,
 	countResult metrics.Histogram,
