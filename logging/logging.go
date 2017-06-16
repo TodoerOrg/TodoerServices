@@ -1,4 +1,4 @@
-package logging
+package main
 
 import (
 	"time"
@@ -7,16 +7,20 @@ import (
 	"github.com/go-kit/kit/log"
 )
 
-// LoggingMiddleware ...
-type LoggingMiddleware struct {
-	Logger log.Logger
-	Next   service.StringService
+func loggingMiddleware(logger log.Logger) service.ServiceMiddleware {
+	return func(next service.StringService) service.StringService {
+		return logmw{logger, next}
+	}
 }
 
-// Uppercase ...
-func (mw LoggingMiddleware) Uppercase(s string) (output string, err error) {
+type logmw struct {
+	logger log.Logger
+	service.StringService
+}
+
+func (mw logmw) Uppercase(s string) (output string, err error) {
 	defer func(begin time.Time) {
-		_ = mw.Logger.Log(
+		_ = mw.logger.Log(
 			"method", "uppercase",
 			"input", s,
 			"output", output,
@@ -25,14 +29,13 @@ func (mw LoggingMiddleware) Uppercase(s string) (output string, err error) {
 		)
 	}(time.Now())
 
-	output, err = mw.Next.Uppercase(s)
+	output, err = mw.StringService.Uppercase(s)
 	return
 }
 
-// Count ...
-func (mw LoggingMiddleware) Count(s string) (n int) {
+func (mw logmw) Count(s string) (n int) {
 	defer func(begin time.Time) {
-		_ = mw.Logger.Log(
+		_ = mw.logger.Log(
 			"method", "count",
 			"input", s,
 			"n", n,
@@ -40,6 +43,6 @@ func (mw LoggingMiddleware) Count(s string) (n int) {
 		)
 	}(time.Now())
 
-	n = mw.Next.Count(s)
+	n = mw.StringService.Count(s)
 	return
 }

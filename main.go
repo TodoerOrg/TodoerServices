@@ -1,23 +1,31 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"net/http"
 	"os"
 
-	instrumenting "github.com/TodoerOrg/TodoerServices/instrumenting"
-	logging "github.com/TodoerOrg/TodoerServices/logging"
-	service "github.com/TodoerOrg/TodoerServices/service"
-	"github.com/TodoerOrg/TodoerServices/transport"
+	"github.com/TodoerOrg/TodoerServices/proxying"
+	"github.com/TodoerOrg/TodoerServices/service"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	log "github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log"
 	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
 	httptransport "github.com/go-kit/kit/transport/http"
 )
 
 func main() {
-	logger := log.NewLogfmtLogger(os.Stderr)
+	var (
+		listen = flag.String("listen", ":8080", "HTTP listen address")
+		proxy  = flag.String("proxy", "", "Optional comma-separated list of URLs to proxy uppercase requests")
+	)
+	flag.Parse()
+
+	var logger log.Logger
+	logger = log.NewLogfmtLogger(os.Stderr)
+	logger = log.With(logger, "listen", *listen, "caller", log.DefaultCaller)
 
 	fieldKeys := []string{"method", "error"}
 	requestCount := kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{
@@ -37,28 +45,28 @@ func main() {
 		Subsystem: "string_service",
 		Name:      "count_result",
 		Help:      "The result of each count method.",
-	}, []string{}) // no fields here
+	}, []string{})
 
 	var svc service.StringService
 	svc = service.StringServiceImpl{}
-	svc = logging.LoggingMiddleware{Logger: logger, Next: svc}
-	svc = instrumenting.InstrumentingMiddleware{RequestCount: requestCount, RequestLatency: requestLatency, CountResult: countResult, Next: svc}
+	svc = proxying.ProxyingMiddleware(context.Background(), *proxy, logger)(svc)
+	svc = loggingMiddleware(logger)(svc)
+	svc = instrumentingMiddleware(requestCount, requestLatency, countResult)(svc)
 
 	uppercaseHandler := httptransport.NewServer(
-		transport.MakeUppercaseEndpoint(svc),
-		transport.DecodeUppercaseRequest,
-		transport.EncodeResponse,
+		makeUppercaseEndpoint(svc),
+		decodeUppercaseRequest,
+		encodeResponse,
 	)
-
 	countHandler := httptransport.NewServer(
-		transport.MakeCountEndpoint(svc),
-		transport.DecodeCountRequest,
-		transport.EncodeResponse,
+		makeCountEndpoint(svc),
+		decodeCountRequest,
+		encodeResponse,
 	)
 
 	http.Handle("/uppercase", uppercaseHandler)
 	http.Handle("/count", countHandler)
 	http.Handle("/metrics", promhttp.Handler())
-	logger.Log("msg", "HTTP", "addr", ":8080")
-	logger.Log("err", http.ListenAndServe(":8080", nil))
+	logger.Log("msg", "HTTP", "addr", *listen)
+	logger.Log("err", http.ListenAndServe(*listen, nil))
 }

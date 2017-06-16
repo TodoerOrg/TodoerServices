@@ -11,10 +11,8 @@ type StringService interface {
 	Count(string) int
 }
 
-// StringServiceImpl ...
 type StringServiceImpl struct{}
 
-// Uppercase ...
 func (StringServiceImpl) Uppercase(s string) (string, error) {
 	if s == "" {
 		return "", ErrEmpty
@@ -22,10 +20,12 @@ func (StringServiceImpl) Uppercase(s string) (string, error) {
 	return strings.ToUpper(s), nil
 }
 
-// Count ...
 func (StringServiceImpl) Count(s string) int {
 	return len(s)
 }
 
 // ErrEmpty is returned when an input string is empty.
 var ErrEmpty = errors.New("empty string")
+
+// ServiceMiddleware is a chainable behavior modifier for StringService.
+type ServiceMiddleware func(StringService) StringService

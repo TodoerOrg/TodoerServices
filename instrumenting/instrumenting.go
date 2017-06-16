@@ -1,4 +1,4 @@
-package instrumenting
+package main
 
 import (
 	"fmt"
@@ -8,35 +8,42 @@ import (
 	"github.com/go-kit/kit/metrics"
 )
 
-// InstrumentingMiddleware ...
-type InstrumentingMiddleware struct {
-	RequestCount   metrics.Counter
-	RequestLatency metrics.Histogram
-	CountResult    metrics.Histogram
-	Next           service.StringService
+func instrumentingMiddleware(
+	requestCount metrics.Counter,
+	requestLatency metrics.Histogram,
+	countResult metrics.Histogram,
+) service.ServiceMiddleware {
+	return func(next StringService) StringService {
+		return instrmw{requestCount, requestLatency, countResult, next}
+	}
 }
 
-// Uppercase ...
-func (mw InstrumentingMiddleware) Uppercase(s string) (output string, err error) {
+type instrmw struct {
+	requestCount   metrics.Counter
+	requestLatency metrics.Histogram
+	countResult    metrics.Histogram
+	service.StringService
+}
+
+func (mw instrmw) Uppercase(s string) (output string, err error) {
 	defer func(begin time.Time) {
 		lvs := []string{"method", "uppercase", "error", fmt.Sprint(err != nil)}
-		mw.RequestCount.With(lvs...).Add(1)
-		mw.RequestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
 	}(time.Now())
 
-	output, err = mw.Next.Uppercase(s)
+	output, err = mw.StringService.Uppercase(s)
 	return
 }
 
-// Count ...
-func (mw InstrumentingMiddleware) Count(s string) (n int) {
+func (mw instrmw) Count(s string) (n int) {
 	defer func(begin time.Time) {
 		lvs := []string{"method", "count", "error", "false"}
-		mw.RequestCount.With(lvs...).Add(1)
-		mw.RequestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
-		mw.CountResult.Observe(float64(n))
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+		mw.countResult.Observe(float64(n))
 	}(time.Now())
 
-	n = mw.Next.Count(s)
+	n = mw.StringService.Count(s)
 	return
 }
